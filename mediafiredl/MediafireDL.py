@@ -1,19 +1,27 @@
 from bs4 import BeautifulSoup
 import requests, os, sys
+from cfscrape import create_scraper
+from re import findall
 
 def GetName(url: str):
-    return url.split('/')[-2]
+    fname = url.split('/')[-2]
+    if "download" in url:
+        if int(url.count("/")) >= 3:
+            fname = url.split('/')[-1]
+    return fname
 
 def GetFileLink(url: str):
-    content = requests.get(url).content
-    soup = BeautifulSoup(content, "html.parser")
-    
-    try: 
-        link = soup.find(id="downloadButton").get("href")
-        return link
-    except Exception as e: 
-        print(e)
-        return e
+    if direct_link := findall(r'https?:\/\/download\d+\.mediafire\.com\/\S+\/\S+\/\S+', url):
+        return direct_link[0]
+    req = create_scraper().request
+    try:
+        url = req('get', url).url
+        page = req('get', url).text
+    except Exception as e:
+        return f"ERROR: {e}"
+    if not (direct_link := findall(r"\'(https?:\/\/download\d+\.mediafire\.com\/\S+\/\S+\/\S+)\'", page)):
+        return "ERROR: No links found in this page"
+    return direct_link[0]
 
 def GetFileSize(url: str):
     with requests.get(GetFileLink(url), stream=True) as r:
